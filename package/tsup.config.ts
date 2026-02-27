@@ -91,14 +91,8 @@ export default defineConfig((options) => [
     splitting: false,
     sourcemap: true,
     clean: !options.watch,
+    external: ["react", "react-dom"],
     esbuildPlugins: [scssModulesPlugin()],
-    esbuildOptions(options) {
-      options.alias = {
-        "react": "preact/compat",
-        "react-dom": "preact/compat",
-      };
-    },
-    noExternal: ["preact"],
     define: {
       __VERSION__: JSON.stringify(VERSION),
     },

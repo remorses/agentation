@@ -1,6 +1,6 @@
 {
   "name": "@critique.work/agentation",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Visual feedback for AI coding agents",
   "license": "PolyForm-Shield-1.0.0",
   "main": "./dist/index.js",
@@ -30,8 +30,17 @@
     "test:watch": "vitest",
     "prepublishOnly": "pnpm build"
   },
-  "dependencies": {
-    "preact": "^10.28.4"
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",
