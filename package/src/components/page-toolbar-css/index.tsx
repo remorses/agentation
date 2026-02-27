@@ -50,6 +50,7 @@ import {
   getFullElementPath,
   getAccessibilityInfo,
   getNearbyElements,
+  getSurroundingNodes,
   closestCrossingShadow,
 } from "../../utils/element-identification";
 import {
@@ -568,6 +569,9 @@ export function PageFeedbackToolbarCSS({
     computedStylesObj?: Record<string, string>;
     nearbyElements?: string;
     reactComponents?: string;
+    lineText?: string;
+    contextBefore?: string[];
+    contextAfter?: string[];
     elementBoundingBoxes?: Array<{
       x: number;
       y: number;
@@ -1500,6 +1504,7 @@ export function PageFeedbackToolbarCSS({
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
         reactComponents: firstItem.reactComponents,
+        ...getSurroundingNodes(firstEl),
       });
     } else {
       // Multiple elements - multi-select annotation
@@ -1558,6 +1563,7 @@ export function PageFeedbackToolbarCSS({
         nearbyElements: getNearbyElements(firstEl),
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
+        ...getSurroundingNodes(firstEl),
       });
     }
 
@@ -1832,7 +1838,7 @@ export function PageFeedbackToolbarCSS({
             };
           }
 
-          // Position marker at click point (on the stroke)
+           // Position marker at click point (on the stroke)
           const annX = (e.clientX / window.innerWidth) * 100;
           const annY = isFixed ? e.clientY : e.clientY + scrollYNow;
 
@@ -1855,6 +1861,7 @@ export function PageFeedbackToolbarCSS({
             targetElement: elementUnder ?? undefined,
             drawingIndex: strokeIdx,
             strokeId: stroke.id,
+            ...(elementUnder ? getSurroundingNodes(elementUnder) : {}),
           });
           setHoverInfo(null);
           setHoveredDrawingIdx(null);
@@ -1980,6 +1987,7 @@ export function PageFeedbackToolbarCSS({
         nearbyElements: getNearbyElements(elementUnder),
         reactComponents: reactComponents ?? undefined,
         targetElement: elementUnder, // Store for live position queries
+        ...getSurroundingNodes(elementUnder),
       });
       setHoverInfo(null);
     };
@@ -2432,6 +2440,7 @@ export function PageFeedbackToolbarCSS({
             nearbyElements: getNearbyElements(firstElement),
             cssClasses: getElementClasses(firstElement),
             nearbyText: getNearbyText(firstElement),
+            ...getSurroundingNodes(firstElement),
           });
         } else {
           // No elements selected, but allow annotation on empty area
@@ -2678,6 +2687,7 @@ export function PageFeedbackToolbarCSS({
             targetElement: elementUnder ?? undefined,
             drawingIndex: strokeIdx,
             strokeId: stroke.id,
+            ...(elementUnder ? getSurroundingNodes(elementUnder) : {}),
           });
           setHoverInfo(null);
           setHoveredDrawingIdx(null);
@@ -2803,6 +2813,7 @@ export function PageFeedbackToolbarCSS({
           targetElement: centerEl ?? undefined,
           drawingIndex: newStrokeIdx,
           strokeId: newStrokeId,
+          ...(centerEl ? getSurroundingNodes(centerEl) : {}),
         });
         setHoverInfo(null);
       }
@@ -2958,6 +2969,9 @@ export function PageFeedbackToolbarCSS({
         elementBoundingBoxes: pendingAnnotation.elementBoundingBoxes,
         drawingIndex: pendingAnnotation.drawingIndex,
         strokeId: pendingAnnotation.strokeId,
+        lineText: pendingAnnotation.lineText,
+        contextBefore: pendingAnnotation.contextBefore,
+        contextAfter: pendingAnnotation.contextAfter,
         // Protocol fields for server sync
         ...(endpoint && currentSessionId
           ? {

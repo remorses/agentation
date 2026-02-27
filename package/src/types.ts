@@ -30,6 +30,11 @@ export type Annotation = {
   drawingIndex?: number; // Index of linked drawing stroke (click-to-annotate)
   strokeId?: string; // Unique ID of linked drawing stroke
 
+  // Surrounding context from sibling nodes in repeated structures
+  lineText?: string; // Text of the node the annotation is on
+  contextBefore?: string[]; // Preceding sibling texts (oldest first)
+  contextAfter?: string[]; // Following sibling texts (closest first)
+
   // Protocol fields (added when syncing to server)
   sessionId?: string;
   url?: string;

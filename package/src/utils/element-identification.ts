@@ -249,6 +249,58 @@ export function getNearbyText(element: HTMLElement): string {
 }
 
 /**
+ * Surrounding context from sibling nodes in a repeated structure.
+ * Walks up the DOM to find the nearest ancestor that is one of many
+ * siblings (e.g. lines in a diff, rows in a table, items in a list),
+ * then collects text from N siblings before and after.
+ */
+export interface SurroundingContext {
+  /** Text of the node the annotation is on */
+  lineText: string;
+  /** Text of preceding sibling nodes (oldest first) */
+  contextBefore: string[];
+  /** Text of following sibling nodes (closest first) */
+  contextAfter: string[];
+}
+
+const MIN_SIBLINGS = 3;
+
+export function getSurroundingNodes(
+  element: HTMLElement,
+  radius: number = 3,
+): SurroundingContext | null {
+  // Walk up to find nearest ancestor whose parent has multiple children
+  // (indicates a repeated structure like lines, rows, list items)
+  let node: HTMLElement | null = element;
+  while (node) {
+    const parent = node.parentElement;
+    if (parent && parent.children.length >= MIN_SIBLINGS) break;
+    node = node.parentElement;
+  }
+  if (!node) return null;
+
+  const lineText = (node.textContent ?? "").replace(/\n/g, " ").trim();
+
+  const contextBefore: string[] = [];
+  let prev = node.previousElementSibling;
+  for (let i = 0; i < radius && prev; i++) {
+    const text = (prev.textContent ?? "").replace(/\n/g, " ").trim();
+    if (text) contextBefore.unshift(text);
+    prev = prev.previousElementSibling;
+  }
+
+  const contextAfter: string[] = [];
+  let next = node.nextElementSibling;
+  for (let i = 0; i < radius && next; i++) {
+    const text = (next.textContent ?? "").replace(/\n/g, " ").trim();
+    if (text) contextAfter.push(text);
+    next = next.nextElementSibling;
+  }
+
+  return { lineText, contextBefore, contextAfter };
+}
+
+/**
  * Simplified element identifier for animation feedback (less verbose)
  */
 export function identifyAnimationElement(target: HTMLElement): string {
