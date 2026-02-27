@@ -515,6 +515,8 @@ export type PageFeedbackToolbarCSSProps = {
   onSessionCreated?: (sessionId: string) => void;
   /** Webhook URL to receive annotation events. */
   webhookUrl?: string;
+  /** Whether to show the pause/resume animations button. Defaults to true. */
+  showFreezeButton?: boolean;
 };
 
 /** Alias for PageFeedbackToolbarCSSProps */
@@ -539,6 +541,7 @@ export function PageFeedbackToolbarCSS({
   sessionId: initialSessionId,
   onSessionCreated,
   webhookUrl,
+  showFreezeButton = true,
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -3781,7 +3784,7 @@ export function PageFeedbackToolbarCSS({
       if (isTyping || e.metaKey || e.ctrlKey) return;
 
       // "P" to toggle pause/freeze
-      if (e.key === "p" || e.key === "P") {
+      if (showFreezeButton && (e.key === "p" || e.key === "P")) {
         e.preventDefault();
         hideTooltipsUntilMouseLeave();
         toggleFreeze();
@@ -3982,6 +3985,7 @@ export function PageFeedbackToolbarCSS({
             } ${tooltipsHidden || showSettings ? styles.tooltipsHidden : ""}`}
             onMouseLeave={showTooltipsAgain}
           >
+            {showFreezeButton && (
             <div
               className={`${styles.buttonWrapper} ${
                 toolbarPosition && toolbarPosition.x < 120
@@ -4005,6 +4009,7 @@ export function PageFeedbackToolbarCSS({
                 <span className={styles.shortcut}>P</span>
               </span>
             </div>
+            )}
 
             <div className={styles.buttonWrapper}>
               <button
