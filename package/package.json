@@ -1,6 +1,6 @@
 {
   "name": "@critique.work/agentation",
-  "version": "2.5.4",
+  "version": "2.5.5",
   "description": "Visual feedback for AI coding agents",
   "license": "PolyForm-Shield-1.0.0",
   "main": "./dist/index.js",

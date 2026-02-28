@@ -29,6 +29,7 @@ export type Annotation = {
   }>; // Individual bounding boxes for multi-select hover highlighting
   drawingIndex?: number; // Index of linked drawing stroke (click-to-annotate)
   strokeId?: string; // Unique ID of linked drawing stroke
+  anchor?: string; // Source location from data-anchor attribute (e.g. "file.ts:42")
 
   // Surrounding context from sibling nodes in repeated structures
   lineText?: string; // Text of the node the annotation is on

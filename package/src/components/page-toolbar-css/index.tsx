@@ -52,6 +52,7 @@ import {
   getNearbyElements,
   getSurroundingNodes,
   closestCrossingShadow,
+  findAnchor,
 } from "../../utils/element-identification";
 import {
   loadAnnotations,
@@ -587,6 +588,7 @@ export function PageFeedbackToolbarCSS({
     targetElement?: HTMLElement;
     drawingIndex?: number;
     strokeId?: string;
+    anchor?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [sendState, setSendState] = useState<
@@ -1864,6 +1866,7 @@ export function PageFeedbackToolbarCSS({
             targetElement: elementUnder ?? undefined,
             drawingIndex: strokeIdx,
             strokeId: stroke.id,
+            anchor: elementUnder ? findAnchor(elementUnder) ?? undefined : undefined,
             ...(elementUnder ? getSurroundingNodes(elementUnder) : {}),
           });
           setHoverInfo(null);
@@ -1990,6 +1993,7 @@ export function PageFeedbackToolbarCSS({
         nearbyElements: getNearbyElements(elementUnder),
         reactComponents: reactComponents ?? undefined,
         targetElement: elementUnder, // Store for live position queries
+        anchor: findAnchor(elementUnder) ?? undefined,
         ...getSurroundingNodes(elementUnder),
       });
       setHoverInfo(null);
@@ -2975,6 +2979,7 @@ export function PageFeedbackToolbarCSS({
         lineText: pendingAnnotation.lineText,
         contextBefore: pendingAnnotation.contextBefore,
         contextAfter: pendingAnnotation.contextAfter,
+        anchor: pendingAnnotation.anchor,
         // Protocol fields for server sync
         ...(endpoint && currentSessionId
           ? {

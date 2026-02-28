@@ -607,6 +607,23 @@ export function parseComputedStylesString(
 }
 
 /**
+ * Finds the nearest data-anchor attribute on the element or its ancestors.
+ * Pages can add data-anchor="file.ts:42" to DOM elements so annotations
+ * automatically capture which source location they refer to.
+ * Crosses shadow DOM boundaries.
+ */
+export function findAnchor(target: HTMLElement): string | null {
+  let current: Element | null = target;
+  while (current && current !== document.documentElement) {
+    if (current instanceof HTMLElement && current.dataset.anchor) {
+      return current.dataset.anchor;
+    }
+    current = getParentElement(current);
+  }
+  return null;
+}
+
+/**
  * Gets accessibility information for an element
  */
 export function getAccessibilityInfo(target: HTMLElement): string {
