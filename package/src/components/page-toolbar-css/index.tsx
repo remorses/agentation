@@ -50,7 +50,9 @@ import {
   getFullElementPath,
   getAccessibilityInfo,
   getNearbyElements,
+  getSurroundingNodes,
   closestCrossingShadow,
+  findAnchor,
 } from "../../utils/element-identification";
 import {
   loadAnnotations,
@@ -514,6 +516,8 @@ export type PageFeedbackToolbarCSSProps = {
   onSessionCreated?: (sessionId: string) => void;
   /** Webhook URL to receive annotation events. */
   webhookUrl?: string;
+  /** Whether to show the pause/resume animations button. Defaults to true. */
+  showFreezeButton?: boolean;
 };
 
 /** Alias for PageFeedbackToolbarCSSProps */
@@ -538,6 +542,7 @@ export function PageFeedbackToolbarCSS({
   sessionId: initialSessionId,
   onSessionCreated,
   webhookUrl,
+  showFreezeButton = true,
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -568,6 +573,9 @@ export function PageFeedbackToolbarCSS({
     computedStylesObj?: Record<string, string>;
     nearbyElements?: string;
     reactComponents?: string;
+    lineText?: string;
+    contextBefore?: string[];
+    contextAfter?: string[];
     elementBoundingBoxes?: Array<{
       x: number;
       y: number;
@@ -580,6 +588,7 @@ export function PageFeedbackToolbarCSS({
     targetElement?: HTMLElement;
     drawingIndex?: number;
     strokeId?: string;
+    anchor?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [sendState, setSendState] = useState<
@@ -1179,7 +1188,7 @@ export function PageFeedbackToolbarCSS({
     return () => clearInterval(interval);
   }, [endpoint, mounted]);
 
-  // Listen for server-side annotation updates (e.g. resolved by agent)
+  // Listen for server-side annotation events (real-time sync with other users)
   useEffect(() => {
     if (!endpoint || !mounted || !currentSessionId) return;
 
@@ -1189,11 +1198,30 @@ export function PageFeedbackToolbarCSS({
 
     const removedStatuses = ["resolved", "dismissed"];
 
-    const handler = (e: MessageEvent) => {
+    const handleCreated = (e: MessageEvent) => {
       try {
         const event = JSON.parse(e.data);
-        if (removedStatuses.includes(event.payload?.status)) {
-          const id = event.payload.id as string;
+        const annotation = event.payload as Annotation;
+        if (!annotation?.id) return;
+        // Skip if we already have this annotation locally (our own create).
+        // Ref check guards the callback; setter check guards state against races.
+        if (annotationsRef.current.some((a) => a.id === annotation.id)) return;
+        setAnnotations((prev) =>
+          prev.some((a) => a.id === annotation.id) ? prev : [...prev, annotation]
+        );
+        onAnnotationAdd?.(annotation);
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    const handleUpdated = (e: MessageEvent) => {
+      try {
+        const event = JSON.parse(e.data);
+        const annotation = event.payload as Annotation;
+        if (!annotation?.id) return;
+        if (removedStatuses.includes(annotation.status!)) {
+          const id = annotation.id;
           // Trigger exit animation then remove
           setExitingMarkers((prev) => new Set(prev).add(id));
           originalSetTimeout(() => {
@@ -1204,16 +1232,47 @@ export function PageFeedbackToolbarCSS({
               return next;
             });
           }, 150);
+        } else {
+          setAnnotations((prev) =>
+            prev.map((a) => (a.id === annotation.id ? { ...a, ...annotation } : a))
+          );
         }
+        onAnnotationUpdate?.(annotation);
       } catch {
         // Ignore parse errors
       }
     };
 
-    eventSource.addEventListener("annotation.updated", handler);
+    const handleDeleted = (e: MessageEvent) => {
+      try {
+        const event = JSON.parse(e.data);
+        const id = (event.payload?.id ?? event.payload) as string;
+        if (!id) return;
+        const existing = annotationsRef.current.find((a) => a.id === id);
+        // Always attempt removal (ref may be stale), callback only if found
+        setExitingMarkers((prev) => new Set(prev).add(id));
+        originalSetTimeout(() => {
+          setAnnotations((prev) => prev.filter((a) => a.id !== id));
+          setExitingMarkers((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }, 150);
+        if (existing) onAnnotationDelete?.(existing);
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    eventSource.addEventListener("annotation.created", handleCreated);
+    eventSource.addEventListener("annotation.updated", handleUpdated);
+    eventSource.addEventListener("annotation.deleted", handleDeleted);
 
     return () => {
-      eventSource.removeEventListener("annotation.updated", handler);
+      eventSource.removeEventListener("annotation.created", handleCreated);
+      eventSource.removeEventListener("annotation.updated", handleUpdated);
+      eventSource.removeEventListener("annotation.deleted", handleDeleted);
       eventSource.close();
     };
   }, [endpoint, mounted, currentSessionId]);
@@ -1450,6 +1509,7 @@ export function PageFeedbackToolbarCSS({
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
         reactComponents: firstItem.reactComponents,
+        ...getSurroundingNodes(firstEl),
       });
     } else {
       // Multiple elements - multi-select annotation
@@ -1508,6 +1568,7 @@ export function PageFeedbackToolbarCSS({
         nearbyElements: getNearbyElements(firstEl),
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
+        ...getSurroundingNodes(firstEl),
       });
     }
 
@@ -1782,7 +1843,7 @@ export function PageFeedbackToolbarCSS({
             };
           }
 
-          // Position marker at click point (on the stroke)
+           // Position marker at click point (on the stroke)
           const annX = (e.clientX / window.innerWidth) * 100;
           const annY = isFixed ? e.clientY : e.clientY + scrollYNow;
 
@@ -1805,6 +1866,8 @@ export function PageFeedbackToolbarCSS({
             targetElement: elementUnder ?? undefined,
             drawingIndex: strokeIdx,
             strokeId: stroke.id,
+            anchor: elementUnder ? findAnchor(elementUnder) ?? undefined : undefined,
+            ...(elementUnder ? getSurroundingNodes(elementUnder) : {}),
           });
           setHoverInfo(null);
           setHoveredDrawingIdx(null);
@@ -1930,6 +1993,8 @@ export function PageFeedbackToolbarCSS({
         nearbyElements: getNearbyElements(elementUnder),
         reactComponents: reactComponents ?? undefined,
         targetElement: elementUnder, // Store for live position queries
+        anchor: findAnchor(elementUnder) ?? undefined,
+        ...getSurroundingNodes(elementUnder),
       });
       setHoverInfo(null);
     };
@@ -2382,6 +2447,7 @@ export function PageFeedbackToolbarCSS({
             nearbyElements: getNearbyElements(firstElement),
             cssClasses: getElementClasses(firstElement),
             nearbyText: getNearbyText(firstElement),
+            ...getSurroundingNodes(firstElement),
           });
         } else {
           // No elements selected, but allow annotation on empty area
@@ -2628,6 +2694,7 @@ export function PageFeedbackToolbarCSS({
             targetElement: elementUnder ?? undefined,
             drawingIndex: strokeIdx,
             strokeId: stroke.id,
+            ...(elementUnder ? getSurroundingNodes(elementUnder) : {}),
           });
           setHoverInfo(null);
           setHoveredDrawingIdx(null);
@@ -2753,6 +2820,7 @@ export function PageFeedbackToolbarCSS({
           targetElement: centerEl ?? undefined,
           drawingIndex: newStrokeIdx,
           strokeId: newStrokeId,
+          ...(centerEl ? getSurroundingNodes(centerEl) : {}),
         });
         setHoverInfo(null);
       }
@@ -2908,6 +2976,10 @@ export function PageFeedbackToolbarCSS({
         elementBoundingBoxes: pendingAnnotation.elementBoundingBoxes,
         drawingIndex: pendingAnnotation.drawingIndex,
         strokeId: pendingAnnotation.strokeId,
+        lineText: pendingAnnotation.lineText,
+        contextBefore: pendingAnnotation.contextBefore,
+        contextAfter: pendingAnnotation.contextAfter,
+        anchor: pendingAnnotation.anchor,
         // Protocol fields for server sync
         ...(endpoint && currentSessionId
           ? {
@@ -3515,6 +3587,14 @@ export function PageFeedbackToolbarCSS({
     const DRAG_THRESHOLD = 10; // pixels
 
     const handleMouseMove = (e: MouseEvent) => {
+      // Self-heal if mouseup was missed (e.g. touch synthesized events,
+      // focus loss, iframe capture). buttons === 0 means no button is pressed.
+      if (e.buttons === 0) {
+        setIsDraggingToolbar(false);
+        setDragStartPos(null);
+        return;
+      }
+
       const deltaX = e.clientX - dragStartPos.x;
       const deltaY = e.clientY - dragStartPos.y;
       const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -3581,6 +3661,13 @@ export function PageFeedbackToolbarCSS({
   // Handle toolbar drag start
   const handleToolbarMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // Disable dragging on touch devices — iOS synthesizes mousedown/mouseup
+      // synchronously after touchend, but the useEffect that adds the mouseup
+      // listener runs after React re-renders, so mouseup fires before the
+      // listener exists and dragStartPos leaks, causing the next tap to
+      // reposition the toolbar instead of creating an annotation.
+      if (navigator.maxTouchPoints > 0) return;
+
       // Only drag when clicking the toolbar background (not buttons or settings)
       if (
         (e.target as HTMLElement).closest("button") ||
@@ -3717,7 +3804,7 @@ export function PageFeedbackToolbarCSS({
       if (isTyping || e.metaKey || e.ctrlKey) return;
 
       // "P" to toggle pause/freeze
-      if (e.key === "p" || e.key === "P") {
+      if (showFreezeButton && (e.key === "p" || e.key === "P")) {
         e.preventDefault();
         hideTooltipsUntilMouseLeave();
         toggleFreeze();
@@ -3918,6 +4005,7 @@ export function PageFeedbackToolbarCSS({
             } ${tooltipsHidden || showSettings ? styles.tooltipsHidden : ""}`}
             onMouseLeave={showTooltipsAgain}
           >
+            {showFreezeButton && (
             <div
               className={`${styles.buttonWrapper} ${
                 toolbarPosition && toolbarPosition.x < 120
@@ -3941,6 +4029,7 @@ export function PageFeedbackToolbarCSS({
                 <span className={styles.shortcut}>P</span>
               </span>
             </div>
+            )}
 
             <div className={styles.buttonWrapper}>
               <button

@@ -33,12 +33,14 @@ export {
   identifyAnimationElement,
   getElementPath,
   getNearbyText,
+  getSurroundingNodes,
   getElementClasses,
   // Shadow DOM support
   isInShadowDOM,
   getShadowHost,
   closestCrossingShadow,
 } from "./utils/element-identification";
+export type { SurroundingContext } from "./utils/element-identification";
 
 export {
   loadAnnotations,
